@@ -1,8 +1,8 @@
 
-// This is a placeholder for the OVH API integration
-// In a real implementation, we would use an appropriate library to interact with the OVH API
+// 这是 OVH API 集成的占位代码
+// 在实际实现中，我们会使用适当的库与 OVH API 交互
 
-export type ServerAvailability = 'available' | 'unavailable' | 'unknown';
+export type ServerAvailability = 'available' | 'unavailable' | 'unknown' | 'checking';
 
 export interface ServerStatus {
   fqn: string;
@@ -27,17 +27,17 @@ export interface OVHConfig {
   options: string[];
 }
 
-// Simulate checking server availability
+// 模拟检查服务器可用性
 export const checkServerAvailability = async (config: OVHConfig): Promise<ServerStatus[]> => {
-  // In a real implementation, we would call the OVH API here
-  // For now, we'll simulate the response
+  // 在实际实现中，我们会调用 OVH API
+  // 现在，我们模拟响应
   
-  console.log("Checking server availability with config:", config);
+  console.log("正在检查服务器可用性，配置:", config);
   
-  // Simulate API delay
+  // 模拟 API 延迟
   await new Promise(resolve => setTimeout(resolve, 1500));
   
-  // For demo purposes, randomly return available or unavailable
+  // 出于演示目的，随机返回可用或不可用
   const isAvailable = Math.random() > 0.7;
   
   return [
@@ -49,20 +49,20 @@ export const checkServerAvailability = async (config: OVHConfig): Promise<Server
   ];
 };
 
-// Simulate purchasing a server
+// 模拟购买服务器
 export const purchaseServer = async (config: OVHConfig, serverStatus: ServerStatus): Promise<{
   success: boolean;
   orderId?: string;
   orderUrl?: string;
   error?: string;
 }> => {
-  console.log("Attempting to purchase server:", serverStatus);
-  console.log("With config:", config);
+  console.log("尝试购买服务器:", serverStatus);
+  console.log("配置:", config);
   
-  // Simulate API delay
+  // 模拟 API 延迟
   await new Promise(resolve => setTimeout(resolve, 2000));
   
-  // Simulate success/failure (70% success rate)
+  // 模拟成功/失败（70%成功率）
   const isSuccessful = Math.random() > 0.3;
   
   if (isSuccessful) {
@@ -74,23 +74,23 @@ export const purchaseServer = async (config: OVHConfig, serverStatus: ServerStat
   } else {
     return {
       success: false,
-      error: "Failed to checkout cart due to payment processing error."
+      error: "由于支付处理错误，结账失败。"
     };
   }
 };
 
-// Simulate sending a Telegram notification
+// 模拟发送 Telegram 通知
 export const sendTelegramNotification = async (
   token: string, 
   chatId: string, 
   message: string
 ): Promise<boolean> => {
-  console.log(`[Telegram] Sending notification to ${chatId}: ${message}`);
+  console.log(`[Telegram] 正在发送通知到 ${chatId}: ${message}`);
   
-  // In a real implementation, we would send an HTTP request to the Telegram API
-  // For now, we'll just simulate it
+  // 在实际实现中，我们会向 Telegram API 发送 HTTP 请求
+  // 现在，我们只是模拟它
   await new Promise(resolve => setTimeout(resolve, 500));
   
-  // Simulate success (95% success rate)
+  // 模拟成功（95%成功率）
   return Math.random() > 0.05;
 };

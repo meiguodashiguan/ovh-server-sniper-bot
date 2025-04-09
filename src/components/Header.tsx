@@ -11,7 +11,7 @@ const Header = () => {
           <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
             <span className="text-primary-foreground font-bold">OVH</span>
           </div>
-          <h1 className="text-xl font-semibold">Server Sniper</h1>
+          <h1 className="text-xl font-semibold">服务器监控工具</h1>
         </div>
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon">

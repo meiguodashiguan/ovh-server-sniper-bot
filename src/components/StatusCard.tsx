@@ -29,13 +29,13 @@ const StatusCard: React.FC<StatusCardProps> = ({ title, status, message, lastUpd
   const getStatusBadge = () => {
     switch (status) {
       case 'available':
-        return <span className="status-badge status-available">Available</span>;
+        return <span className="status-badge status-available">可用</span>;
       case 'unavailable':
-        return <span className="status-badge status-unavailable">Unavailable</span>;
+        return <span className="status-badge status-unavailable">不可用</span>;
       case 'checking':
-        return <span className="status-badge status-checking">Checking...</span>;
+        return <span className="status-badge status-checking">检查中...</span>;
       default:
-        return <span className="status-badge status-unknown">Unknown</span>;
+        return <span className="status-badge status-unknown">未知</span>;
     }
   };
 
@@ -51,7 +51,7 @@ const StatusCard: React.FC<StatusCardProps> = ({ title, status, message, lastUpd
         <p className="text-sm text-muted-foreground">{message}</p>
       </CardContent>
       <CardFooter className="pt-2 text-xs text-muted-foreground flex justify-between">
-        <span>Last updated: {lastUpdated || 'Never'}</span>
+        <span>最后更新: {lastUpdated || '从未'}</span>
         <div className="flex items-center gap-1">
           {getStatusIcon()}
         </div>

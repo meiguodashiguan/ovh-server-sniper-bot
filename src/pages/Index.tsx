@@ -38,14 +38,14 @@ const Index = () => {
   const [lastChecked, setLastChecked] = useState<string | null>(null);
   const intervalRef = useRef<number | null>(null);
 
-  // Add a log entry
+  // 添加日志条目
   const addLog = (level: 'info' | 'warning' | 'error' | 'success', message: string) => {
     const now = new Date();
     const timestamp = now.toLocaleTimeString();
     setLogs(prev => [{ timestamp, level, message }, ...prev]);
   };
 
-  // Add a notification
+  // 添加通知
   const addNotification = (type: 'info' | 'success' | 'warning' | 'error', title: string, message: string) => {
     const now = new Date();
     const timestamp = now.toLocaleTimeString();
@@ -58,7 +58,7 @@ const Index = () => {
     };
     setNotifications(prev => [newNotification, ...prev]);
     
-    // Also show as toast
+    // 也显示为 toast
     toast({
       title,
       description: message,
@@ -66,14 +66,14 @@ const Index = () => {
     });
   };
 
-  // Handle form submission
+  // 处理表单提交
   const handleFormSubmit = (newConfig: OVHConfig) => {
     setConfig(newConfig);
-    addLog('info', `Configuration updated`);
-    addNotification('info', 'Configuration Updated', 'Server monitoring configuration has been updated.');
+    addLog('info', `配置已更新`);
+    addNotification('info', '配置已更新', '服务器监控配置已更新。');
   };
 
-  // Toggle monitoring on/off
+  // 切换监控开关
   const toggleMonitoring = () => {
     if (isRunning) {
       stopMonitoring();
@@ -82,26 +82,26 @@ const Index = () => {
     }
   };
 
-  // Start monitoring
+  // 开始监控
   const startMonitoring = () => {
     if (!config.appKey || !config.appSecret || !config.consumerKey) {
-      addLog('error', 'Cannot start monitoring: Missing OVH API credentials');
-      addNotification('error', 'Configuration Error', 'OVH API credentials are required to start monitoring.');
+      addLog('error', '无法开始监控：缺少 OVH API 凭据');
+      addNotification('error', '配置错误', '需要 OVH API 凭据才能开始监控。');
       return;
     }
 
     setIsRunning(true);
-    addLog('info', 'Monitoring started');
-    addNotification('info', 'Monitoring Started', 'Server availability monitoring has been activated.');
+    addLog('info', '监控已启动');
+    addNotification('info', '监控已启动', '服务器可用性监控已激活。');
     checkAvailability();
 
-    // Check every 60 seconds (in a real app, you might want to make this configurable)
+    // 每 60 秒检查一次（在实际应用中，您可能希望使其可配置）
     intervalRef.current = window.setInterval(() => {
       checkAvailability();
     }, 60000);
   };
 
-  // Stop monitoring
+  // 停止监控
   const stopMonitoring = () => {
     if (intervalRef.current !== null) {
       clearInterval(intervalRef.current);
@@ -109,10 +109,10 @@ const Index = () => {
     }
     
     setIsRunning(false);
-    addLog('info', 'Monitoring stopped');
-    addNotification('warning', 'Monitoring Stopped', 'Server availability monitoring has been deactivated.');
+    addLog('info', '监控已停止');
+    addNotification('warning', '监控已停止', '服务器可用性监控已停用。');
     
-    // Reset server status to unknown when stopping
+    // 停止时将服务器状态重置为未知
     if (serverStatus) {
       setServerStatus({
         ...serverStatus,
@@ -121,23 +121,28 @@ const Index = () => {
     }
   };
 
-  // Clear logs
+  // 清除日志
   const clearLogs = () => {
     setLogs([]);
   };
 
-  // Clear notifications
+  // 清除通知
   const clearNotifications = () => {
     setNotifications([]);
   };
 
-  // Check server availability
+  // 检查服务器可用性
   const checkAvailability = async () => {
     try {
-      // Update status to checking
-      setServerStatus(prev => prev ? { ...prev, availability: 'checking' } : null);
+      // 更新状态为正在检查
+      if (serverStatus) {
+        setServerStatus({
+          ...serverStatus,
+          availability: 'checking'
+        });
+      }
       
-      addLog('info', `Checking availability for plan: ${config.planCode}`);
+      addLog('info', `正在检查计划可用性: ${config.planCode}`);
       const result = await checkServerAvailability(config);
       
       if (result.length > 0) {
@@ -146,81 +151,86 @@ const Index = () => {
         setLastChecked(new Date().toLocaleTimeString());
         
         if (status.availability === 'available') {
-          addLog('success', `Server ${status.fqn} is available in ${status.datacenter}!`);
+          addLog('success', `服务器 ${status.fqn} 在 ${status.datacenter} 可用!`);
           addNotification(
             'success',
-            'Server Available!',
-            `Server ${status.fqn} is available in ${status.datacenter} datacenter.`
+            '服务器可用!',
+            `服务器 ${status.fqn} 在数据中心 ${status.datacenter} 可用。`
           );
           
-          // Send Telegram notification if configured
+          // 如果配置了 Telegram，发送 Telegram 通知
           if (config.telegramToken && config.telegramChatId) {
-            const message = `${config.identity}: Found ${config.planCode} (${status.fqn}) available in ${status.datacenter}`;
+            const message = `${config.identity}: 已找到 ${config.planCode} (${status.fqn}) 在 ${status.datacenter} 可用`;
             const sent = await sendTelegramNotification(config.telegramToken, config.telegramChatId, message);
             
             if (sent) {
-              addLog('info', 'Telegram notification sent');
+              addLog('info', 'Telegram 通知已发送');
             } else {
-              addLog('error', 'Failed to send Telegram notification');
+              addLog('error', '无法发送 Telegram 通知');
             }
           }
           
-          // Auto checkout if enabled
+          // 如果启用了自动结账
           if (config.autoCheckout) {
             handlePurchase(status);
           }
         } else {
-          addLog('info', `Server ${status.fqn} is currently unavailable in ${status.datacenter}`);
+          addLog('info', `服务器 ${status.fqn} 当前在 ${status.datacenter} 不可用`);
         }
       } else {
-        addLog('warning', `No information found for plan: ${config.planCode}`);
+        addLog('warning', `未找到计划的信息: ${config.planCode}`);
         setServerStatus(null);
       }
     } catch (error) {
-      addLog('error', `Error checking availability: ${error instanceof Error ? error.message : String(error)}`);
-      addNotification('error', 'Monitoring Error', 'Failed to check server availability.');
-      setServerStatus(prev => prev ? { ...prev, availability: 'unknown' } : null);
+      addLog('error', `检查可用性时出错: ${error instanceof Error ? error.message : String(error)}`);
+      addNotification('error', '监控错误', '检查服务器可用性失败。');
+      if (serverStatus) {
+        setServerStatus({
+          ...serverStatus,
+          availability: 'unknown'
+        });
+      }
     }
   };
 
-  // Handle server purchase
+  // 处理服务器购买
   const handlePurchase = async (status: ServerStatus) => {
     try {
-      addLog('info', `Attempting to purchase server ${status.fqn} in ${status.datacenter}`);
-      addNotification('info', 'Purchase Started', `Attempting to purchase server ${status.fqn} in ${status.datacenter}`);
+      addLog('info', `尝试购买服务器 ${status.fqn} 在 ${status.datacenter}`);
+      addNotification('info', '开始购买', `尝试购买服务器 ${status.fqn} 在 ${status.datacenter}`);
       
       const result = await purchaseServer(config, status);
       
       if (result.success) {
-        addLog('success', `Order successful! Order ID: ${result.orderId}`);
+        addLog('success', `订单成功! 订单 ID: ${result.orderId}`);
         addNotification(
           'success',
-          'Purchase Successful!',
-          `Server ordered successfully. Order ID: ${result.orderId}`
+          '购买成功!',
+          `服务器订购成功。订单 ID: ${result.orderId}`
         );
         
-        // Send Telegram notification about successful purchase
+        // 发送关于成功购买的 Telegram 通知
         if (config.telegramToken && config.telegramChatId) {
-          const message = `${config.identity}: Order ${result.orderId} created successfully!\nServer: ${status.fqn}\nDatacenter: ${status.datacenter}\nOrder Link: ${result.orderUrl}`;
+          const message = `${config.identity}: 订单 ${result.orderId} 创建成功!\n服务器: ${status.fqn}\n数据中心: ${status.datacenter}\n订单链接: ${result.orderUrl}`;
           await sendTelegramNotification(config.telegramToken, config.telegramChatId, message);
         }
       } else {
-        addLog('error', `Purchase failed: ${result.error}`);
-        addNotification('error', 'Purchase Failed', result.error || 'Failed to complete server purchase');
+        addLog('error', `购买失败: ${result.error}`);
+        addNotification('error', '购买失败', result.error || '无法完成服务器购买');
         
-        // Send Telegram notification about failed purchase
+        // 发送关于失败购买的 Telegram 通知
         if (config.telegramToken && config.telegramChatId) {
-          const message = `${config.identity}: Purchase failed - ${result.error}`;
+          const message = `${config.identity}: 购买失败 - ${result.error}`;
           await sendTelegramNotification(config.telegramToken, config.telegramChatId, message);
         }
       }
     } catch (error) {
-      addLog('error', `Error during purchase: ${error instanceof Error ? error.message : String(error)}`);
-      addNotification('error', 'Purchase Error', 'An unexpected error occurred during purchase');
+      addLog('error', `购买过程中出错: ${error instanceof Error ? error.message : String(error)}`);
+      addNotification('error', '购买错误', '购买过程中发生意外错误');
     }
   };
 
-  // Clean up on unmount
+  // 组件卸载时清理
   useEffect(() => {
     return () => {
       if (intervalRef.current !== null) {
@@ -229,21 +239,21 @@ const Index = () => {
     };
   }, []);
 
-  // Format status message
+  // 格式化状态消息
   const getStatusMessage = () => {
     if (!serverStatus) {
-      return 'No server information available. Start monitoring to check server status.';
+      return '无服务器信息可用。开始监控以检查服务器状态。';
     }
     
     switch (serverStatus.availability) {
       case 'available':
-        return `Server ${serverStatus.fqn} is available in datacenter ${serverStatus.datacenter}!`;
+        return `服务器 ${serverStatus.fqn} 在数据中心 ${serverStatus.datacenter} 可用!`;
       case 'unavailable':
-        return `Server ${serverStatus.fqn} is not available in datacenter ${serverStatus.datacenter}.`;
+        return `服务器 ${serverStatus.fqn} 在数据中心 ${serverStatus.datacenter} 不可用。`;
       case 'checking':
-        return 'Checking server availability...';
+        return '正在检查服务器可用性...';
       default:
-        return 'Server status unknown. Start monitoring to check availability.';
+        return '服务器状态未知。开始监控以检查可用性。';
     }
   };
 
@@ -251,7 +261,7 @@ const Index = () => {
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
       <main className="flex-1 container py-8">
-        <h1 className="text-3xl font-bold mb-8">OVH Server Sniper</h1>
+        <h1 className="text-3xl font-bold mb-8">OVH 服务器监控工具</h1>
         
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2">
@@ -263,10 +273,10 @@ const Index = () => {
             
             <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
               <StatusCard 
-                title="Server Availability" 
+                title="服务器可用性" 
                 status={serverStatus?.availability || 'unknown'} 
                 message={getStatusMessage()}
-                lastUpdated={lastChecked || 'Never'}
+                lastUpdated={lastChecked || '从未'}
               />
               
               <div className="space-y-6">
@@ -285,7 +295,7 @@ const Index = () => {
       </main>
       <footer className="py-6 border-t">
         <div className="container flex justify-between text-sm text-muted-foreground">
-          <p>OVH Server Sniper Bot</p>
+          <p>OVH 服务器监控机器人</p>
           <p>© {new Date().getFullYear()}</p>
         </div>
       </footer>

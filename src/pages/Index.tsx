@@ -5,7 +5,7 @@ import ServerForm from '@/components/ServerForm';
 import StatusCard from '@/components/StatusCard';
 import LogViewer, { LogEntry } from '@/components/LogViewer';
 import NotificationHistory, { Notification } from '@/components/NotificationHistory';
-import { OVHConfig, ServerStatus, checkServerAvailability, purchaseServer, sendTelegramNotification } from '@/utils/ovhApi';
+import { OVHConfig, ServerStatus, checkServerAvailability, purchaseServer } from '@/utils/ovhApi';
 import { useToast } from "@/hooks/use-toast";
 import { v4 as uuidv4 } from 'uuid';
 
@@ -17,8 +17,6 @@ const Index = () => {
     appSecret: "",
     consumerKey: "",
     endpoint: "ovh-eu",
-    telegramToken: "",
-    telegramChatId: "",
     identity: "go-ovh-fr",
     zone: "FR",
     planCode: "25skmystery01",
@@ -37,6 +35,20 @@ const Index = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [lastChecked, setLastChecked] = useState<string | null>(null);
   const intervalRef = useRef<number | null>(null);
+
+  // 当组件加载时，从本地存储中恢复配置
+  useEffect(() => {
+    const savedConfig = localStorage.getItem('ovhConfig');
+    if (savedConfig) {
+      try {
+        const parsedConfig = JSON.parse(savedConfig);
+        setConfig(parsedConfig);
+        addLog('info', '已从本地存储加载配置');
+      } catch (error) {
+        console.error('无法解析存储的配置:', error);
+      }
+    }
+  }, []);
 
   // 添加日志条目
   const addLog = (level: 'info' | 'warning' | 'error' | 'success', message: string) => {
@@ -69,8 +81,12 @@ const Index = () => {
   // 处理表单提交
   const handleFormSubmit = (newConfig: OVHConfig) => {
     setConfig(newConfig);
-    addLog('info', `配置已更新`);
-    addNotification('info', '配置已更新', '服务器监控配置已更新。');
+    
+    // 保存配置到本地存储
+    localStorage.setItem('ovhConfig', JSON.stringify(newConfig));
+    
+    addLog('info', `配置已更新并保存`);
+    addNotification('info', '配置已更新', '服务器监控配置已更新并保存到本地。');
   };
 
   // 切换监控开关
@@ -158,18 +174,6 @@ const Index = () => {
             `服务器 ${status.fqn} 在数据中心 ${status.datacenter} 可用。`
           );
           
-          // 如果配置了 Telegram，发送 Telegram 通知
-          if (config.telegramToken && config.telegramChatId) {
-            const message = `${config.identity}: 已找到 ${config.planCode} (${status.fqn}) 在 ${status.datacenter} 可用`;
-            const sent = await sendTelegramNotification(config.telegramToken, config.telegramChatId, message);
-            
-            if (sent) {
-              addLog('info', 'Telegram 通知已发送');
-            } else {
-              addLog('error', '无法发送 Telegram 通知');
-            }
-          }
-          
           // 如果启用了自动结账
           if (config.autoCheckout) {
             handlePurchase(status);
@@ -208,21 +212,9 @@ const Index = () => {
           '购买成功!',
           `服务器订购成功。订单 ID: ${result.orderId}`
         );
-        
-        // 发送关于成功购买的 Telegram 通知
-        if (config.telegramToken && config.telegramChatId) {
-          const message = `${config.identity}: 订单 ${result.orderId} 创建成功!\n服务器: ${status.fqn}\n数据中心: ${status.datacenter}\n订单链接: ${result.orderUrl}`;
-          await sendTelegramNotification(config.telegramToken, config.telegramChatId, message);
-        }
       } else {
         addLog('error', `购买失败: ${result.error}`);
         addNotification('error', '购买失败', result.error || '无法完成服务器购买');
-        
-        // 发送关于失败购买的 Telegram 通知
-        if (config.telegramToken && config.telegramChatId) {
-          const message = `${config.identity}: 购买失败 - ${result.error}`;
-          await sendTelegramNotification(config.telegramToken, config.telegramChatId, message);
-        }
       }
     } catch (error) {
       addLog('error', `购买过程中出错: ${error instanceof Error ? error.message : String(error)}`);
@@ -268,7 +260,8 @@ const Index = () => {
             <ServerForm 
               onSubmit={handleFormSubmit} 
               isRunning={isRunning} 
-              onToggleMonitoring={toggleMonitoring} 
+              onToggleMonitoring={toggleMonitoring}
+              initialConfig={config} 
             />
             
             <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -295,7 +288,7 @@ const Index = () => {
       </main>
       <footer className="py-6 border-t">
         <div className="container flex justify-between text-sm text-muted-foreground">
-          <p>OVH 服务器监控机器人</p>
+          <p>OVH 服务器监控工具</p>
           <p>© {new Date().getFullYear()}</p>
         </div>
       </footer>
@@ -304,3 +297,4 @@ const Index = () => {
 };
 
 export default Index;
+

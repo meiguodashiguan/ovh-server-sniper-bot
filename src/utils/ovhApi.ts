@@ -1,4 +1,3 @@
-
 // 这是 OVH API 集成的占位代码
 // 在实际实现中，我们会使用适当的库与 OVH API 交互
 
@@ -15,8 +14,6 @@ export interface OVHConfig {
   appSecret: string;
   consumerKey: string;
   endpoint: string;
-  telegramToken: string;
-  telegramChatId: string;
   identity: string;
   zone: string;
   planCode: string;
@@ -77,20 +74,4 @@ export const purchaseServer = async (config: OVHConfig, serverStatus: ServerStat
       error: "由于支付处理错误，结账失败。"
     };
   }
-};
-
-// 模拟发送 Telegram 通知
-export const sendTelegramNotification = async (
-  token: string, 
-  chatId: string, 
-  message: string
-): Promise<boolean> => {
-  console.log(`[Telegram] 正在发送通知到 ${chatId}: ${message}`);
-  
-  // 在实际实现中，我们会向 Telegram API 发送 HTTP 请求
-  // 现在，我们只是模拟它
-  await new Promise(resolve => setTimeout(resolve, 500));
-  
-  // 模拟成功（95%成功率）
-  return Math.random() > 0.05;
 };

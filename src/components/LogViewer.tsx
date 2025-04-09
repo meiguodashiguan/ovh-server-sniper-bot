@@ -36,7 +36,7 @@ const LogViewer: React.FC<LogViewerProps> = ({ logs, onClearLogs }) => {
     <Card className="h-full">
       <CardHeader className="pb-2">
         <div className="flex justify-between items-center">
-          <CardTitle className="text-lg">Monitoring Logs</CardTitle>
+          <CardTitle className="text-lg">监控日志</CardTitle>
           <Button 
             variant="outline" 
             size="sm" 
@@ -44,7 +44,7 @@ const LogViewer: React.FC<LogViewerProps> = ({ logs, onClearLogs }) => {
             onClick={onClearLogs}
           >
             <Trash2 className="h-4 w-4" />
-            Clear
+            清除
           </Button>
         </div>
       </CardHeader>
@@ -52,7 +52,7 @@ const LogViewer: React.FC<LogViewerProps> = ({ logs, onClearLogs }) => {
         <ScrollArea className="h-[300px] p-4 rounded-md border">
           {logs.length === 0 ? (
             <p className="text-center text-sm text-muted-foreground p-4">
-              No logs yet. Start monitoring to see activity.
+              暂无日志。开始监控后将显示活动记录。
             </p>
           ) : (
             <div className="space-y-1">
@@ -60,7 +60,10 @@ const LogViewer: React.FC<LogViewerProps> = ({ logs, onClearLogs }) => {
                 <div key={index} className="text-xs font-mono">
                   <span className="text-gray-500">[{log.timestamp}]</span>{' '}
                   <span className={getLogClass(log.level)}>
-                    {log.level.toUpperCase()}
+                    {log.level === 'info' ? '信息' : 
+                     log.level === 'warning' ? '警告' : 
+                     log.level === 'error' ? '错误' : 
+                     log.level === 'success' ? '成功' : log.level.toUpperCase()}
                   </span>:{' '}
                   <span>{log.message}</span>
                 </div>
@@ -74,3 +77,4 @@ const LogViewer: React.FC<LogViewerProps> = ({ logs, onClearLogs }) => {
 };
 
 export default LogViewer;
+

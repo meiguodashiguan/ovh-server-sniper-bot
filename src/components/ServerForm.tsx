@@ -13,52 +13,17 @@ interface ServerFormProps {
   onSubmit: (config: OVHConfig) => void;
   isRunning: boolean;
   onToggleMonitoring: () => void;
+  initialConfig: OVHConfig;
 }
 
-const ServerForm: React.FC<ServerFormProps> = ({ onSubmit, isRunning, onToggleMonitoring }) => {
+const ServerForm: React.FC<ServerFormProps> = ({ onSubmit, isRunning, onToggleMonitoring, initialConfig }) => {
   const { toast } = useToast();
-  const [formData, setFormData] = useState<OVHConfig>({
-    appKey: "",
-    appSecret: "",
-    consumerKey: "",
-    endpoint: "ovh-eu",
-    telegramToken: "",
-    telegramChatId: "",
-    identity: "go-ovh-fr",
-    zone: "FR",
-    planCode: "25skmystery01",
-    os: "none_64.en",
-    duration: "P1M",
-    datacenter: "rbx",
-    autoCheckout: false,
-    options: [
-      "bandwidth-1000-unguaranteed-25skmystery01",
-      "ram-64g-ecc-2133-25skmystery01",
-      "softraid-2x480ssd-25skmystery01"
-    ]
-  });
+  const [formData, setFormData] = useState<OVHConfig>(initialConfig);
 
-  // 从本地存储加载配置
   useEffect(() => {
-    const savedConfig = localStorage.getItem('ovhConfig');
-    if (savedConfig) {
-      try {
-        const parsedConfig = JSON.parse(savedConfig);
-        setFormData(parsedConfig);
-        toast({
-          title: "配置已加载",
-          description: "已从本地存储加载您之前保存的配置。"
-        });
-      } catch (error) {
-        console.error("无法解析保存的配置:", error);
-        toast({
-          title: "加载配置失败",
-          description: "无法加载本地存储的配置。",
-          variant: "destructive"
-        });
-      }
-    }
-  }, [toast]);
+    // Update formData when initialConfig changes
+    setFormData(initialConfig);
+  }, [initialConfig]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -180,32 +145,6 @@ const ServerForm: React.FC<ServerFormProps> = ({ onSubmit, isRunning, onToggleMo
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-            </div>
-          </div>
-          
-          <div className="space-y-2">
-            <h3 className="text-sm font-medium">Telegram 通知设置</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="telegramToken">Telegram 机器人令牌</Label>
-                <Input 
-                  id="telegramToken" 
-                  name="telegramToken" 
-                  placeholder="Telegram 机器人令牌" 
-                  value={formData.telegramToken} 
-                  onChange={handleChange}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="telegramChatId">聊天 ID</Label>
-                <Input 
-                  id="telegramChatId" 
-                  name="telegramChatId" 
-                  placeholder="Telegram 聊天 ID" 
-                  value={formData.telegramChatId} 
-                  onChange={handleChange}
-                />
               </div>
             </div>
           </div>

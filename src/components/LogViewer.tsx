@@ -63,7 +63,7 @@ const LogViewer: React.FC<LogViewerProps> = ({ logs, onClearLogs }) => {
                     {log.level === 'info' ? '信息' : 
                      log.level === 'warning' ? '警告' : 
                      log.level === 'error' ? '错误' : 
-                     log.level === 'success' ? '成功' : log.level.toUpperCase()}
+                     log.level === 'success' ? '成功' : log.level}
                   </span>:{' '}
                   <span>{log.message}</span>
                 </div>
@@ -77,4 +77,3 @@ const LogViewer: React.FC<LogViewerProps> = ({ logs, onClearLogs }) => {
 };
 
 export default LogViewer;
-

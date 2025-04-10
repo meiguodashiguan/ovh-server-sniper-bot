@@ -33,13 +33,20 @@ export const checkServerAvailability = async (config: OVHConfig): Promise<Server
   console.log("正在检查服务器可用性，配置:", config);
   
   try {
+    // 添加超时处理
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒超时
+    
     const response = await fetch(`${API_BASE_URL}/check-availability`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(config),
+      signal: controller.signal
     });
+    
+    clearTimeout(timeoutId);
     
     if (!response.ok) {
       // 尝试解析错误信息
@@ -70,13 +77,19 @@ export const purchaseServer = async (config: OVHConfig, serverStatus: ServerStat
   console.log("配置:", config);
   
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒超时
+    
     const response = await fetch(`${API_BASE_URL}/purchase-server`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ config, serverStatus }),
+      signal: controller.signal
     });
+    
+    clearTimeout(timeoutId);
     
     try {
       const data = await response.json();
@@ -107,7 +120,14 @@ export const purchaseServer = async (config: OVHConfig, serverStatus: ServerStat
 // 健康状态检查
 export const checkApiHealth = async (): Promise<{ status: string, timestamp: string }> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/health`);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒超时
+    
+    const response = await fetch(`${API_BASE_URL}/health`, {
+      signal: controller.signal
+    });
+    
+    clearTimeout(timeoutId);
     
     if (!response.ok) {
       throw new Error(`健康检查失败: ${response.status}`);
@@ -119,3 +139,4 @@ export const checkApiHealth = async (): Promise<{ status: string, timestamp: str
     throw error;
   }
 };
+

@@ -1,4 +1,3 @@
-
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
@@ -8,11 +7,27 @@ const crypto = require('crypto');
 dotenv.config();
 
 const app = express();
-app.use(cors());
+
+// 配置更完整的 CORS 选项
+app.use(cors({
+  origin: ['http://localhost:8080', 'https://f8e063de-2d8e-45dc-9801-7c7507e3e60b.lovableproject.com'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 app.use(bodyParser.json());
 
 // 启用详细日志记录
 const DEBUG = true;
+
+// 请求日志记录中间件
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+  if (DEBUG && req.body) {
+    console.log('Request body:', JSON.stringify(req.body, null, 2));
+  }
+  next();
+});
 
 // OVH API签名生成器
 function createOvhSignature(method, url, body, timestamp, appSecret, consumerKey) {
@@ -30,7 +45,7 @@ function createOvhSignature(method, url, body, timestamp, appSecret, consumerKey
 }
 
 // 检查服务器可用性
-app.post('/api/check-availability', async (req, res) => {
+app.post('/check-availability', async (req, res) => {
   try {
     const config = req.body;
     
@@ -116,7 +131,7 @@ app.post('/api/check-availability', async (req, res) => {
 });
 
 // 购买服务器
-app.post('/api/purchase-server', async (req, res) => {
+app.post('/purchase-server', async (req, res) => {
   try {
     const { config, serverStatus } = req.body;
     
@@ -213,7 +228,7 @@ app.post('/api/purchase-server', async (req, res) => {
 });
 
 // 添加健康状态检查端点
-app.get('/api/health', (req, res) => {
+app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
@@ -221,4 +236,5 @@ const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`服务器正在监听端口: ${PORT}`);
   console.log(`调试模式: ${DEBUG ? '启用' : '禁用'}`);
+  console.log(`CORS 已启用，允许来源: http://localhost:8080, https://f8e063de-2d8e-45dc-9801-7c7507e3e60b.lovableproject.com`);
 });

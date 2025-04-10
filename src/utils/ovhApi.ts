@@ -1,6 +1,6 @@
 
-// OVH API 类型定义
-import { API_BASE_URL } from '@/config';
+// 这是 OVH API 集成的占位代码
+// 在实际实现中，我们会使用适当的库与 OVH API 交互
 
 export type ServerAvailability = 'available' | 'unavailable' | 'unknown' | 'checking';
 
@@ -28,70 +28,29 @@ export interface OVHConfig {
   maxAttempts?: number; // 最大尝试次数，0表示无限
 }
 
-// 检查服务器可用性
+// 模拟检查服务器可用性
 export const checkServerAvailability = async (config: OVHConfig): Promise<ServerStatus[]> => {
+  // 在实际实现中，我们会调用 OVH API
+  // 现在，我们模拟响应
+  
   console.log("正在检查服务器可用性，配置:", config);
   
-  try {
-    // 添加超时处理
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒超时
-    
-    const response = await fetch(`${API_BASE_URL}/check-availability`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(config),
-      signal: controller.signal
-    });
-    
-    clearTimeout(timeoutId);
-    
-    if (!response.ok) {
-      // 尝试解析错误信息
-      try {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `请求失败: ${response.status}`);
-      } catch (jsonError) {
-        // 如果不是有效的JSON，则直接返回状态码
-        throw new Error(`请求失败: ${response.status}`);
-      }
+  // 模拟 API 延迟
+  await new Promise(resolve => setTimeout(resolve, 1500));
+  
+  // 出于演示目的，随机返回可用或不可用
+  const isAvailable = Math.random() > 0.7;
+  
+  return [
+    {
+      fqn: `KS-${config.planCode}`,
+      datacenter: config.datacenter || 'rbx',
+      availability: isAvailable ? 'available' : 'unavailable'
     }
-    
-    const result = await response.json();
-    
-    // 处理OVH API的直接响应
-    if (Array.isArray(result)) {
-      // 如果返回的是数组，说明是直接从OVH API获取的格式
-      // 需要转换为我们的ServerStatus格式
-      return result.map(item => {
-        let availability: ServerAvailability = 'unknown';
-        
-        if (item.availability === 'available') {
-          availability = 'available';
-        } else if (item.availability === 'unavailable') {
-          availability = 'unavailable';
-        }
-        
-        return {
-          fqn: `KS-${config.planCode}`,
-          datacenter: item.datacenter || config.datacenter || 'unknown',
-          availability: availability
-        };
-      });
-    }
-    
-    // 如果返回的已经是我们的格式，直接返回
-    return result;
-    
-  } catch (error) {
-    console.error("检查服务器可用性出错:", error);
-    throw error;
-  }
+  ];
 };
 
-// 购买服务器
+// 模拟购买服务器
 export const purchaseServer = async (config: OVHConfig, serverStatus: ServerStatus): Promise<{
   success: boolean;
   orderId?: string;
@@ -101,76 +60,22 @@ export const purchaseServer = async (config: OVHConfig, serverStatus: ServerStat
   console.log("尝试购买服务器:", serverStatus);
   console.log("配置:", config);
   
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒超时
-    
-    const response = await fetch(`${API_BASE_URL}/purchase-server`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ config, serverStatus }),
-      signal: controller.signal
-    });
-    
-    clearTimeout(timeoutId);
-    
-    try {
-      const data = await response.json();
-      
-      if (!response.ok) {
-        return {
-          success: false,
-          error: data.error || '购买请求失败'
-        };
-      }
-      
-      // 如果收到的是直接的OVH API响应
-      if (data.orderId) {
-        return {
-          success: true,
-          orderId: data.orderId,
-          orderUrl: `https://www.ovh.com/manager/order/follow.html?orderId=${data.orderId}`
-        };
-      }
-      
-      // 否则返回我们预期的格式
-      return data;
-    } catch (jsonError) {
-      return {
-        success: false,
-        error: `解析服务器响应时出错: ${jsonError instanceof Error ? jsonError.message : String(jsonError)}`
-      };
-    }
-  } catch (error) {
-    console.error("购买服务器出错:", error instanceof Error ? error.message : String(error));
+  // 模拟 API 延迟
+  await new Promise(resolve => setTimeout(resolve, 2000));
+  
+  // 模拟成功/失败（70%成功率）
+  const isSuccessful = Math.random() > 0.3;
+  
+  if (isSuccessful) {
+    return {
+      success: true,
+      orderId: `ORDER-${Date.now().toString(36)}`,
+      orderUrl: `https://www.ovh.com/manager/order/follow.html?orderId=${Date.now().toString(36)}`
+    };
+  } else {
     return {
       success: false,
-      error: error instanceof Error ? error.message : '购买过程中发生未知错误'
+      error: "由于支付处理错误，结账失败。"
     };
-  }
-};
-
-// 健康状态检查
-export const checkApiHealth = async (): Promise<{ status: string, timestamp: string }> => {
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒超时
-    
-    const response = await fetch(`${API_BASE_URL}/health`, {
-      signal: controller.signal
-    });
-    
-    clearTimeout(timeoutId);
-    
-    if (!response.ok) {
-      throw new Error(`健康检查失败: ${response.status}`);
-    }
-    
-    return await response.json();
-  } catch (error) {
-    console.error("API健康检查失败:", error);
-    throw error;
   }
 };

@@ -5,6 +5,7 @@ import ServerForm from '@/components/ServerForm';
 import StatusCard from '@/components/StatusCard';
 import LogViewer, { LogEntry } from '@/components/LogViewer';
 import NotificationHistory, { Notification } from '@/components/NotificationHistory';
+import PurchaseLoopStatus from '@/components/PurchaseLoopStatus';
 import { OVHConfig, ServerStatus, checkServerAvailability, purchaseServer } from '@/utils/ovhApi';
 import { useToast } from "@/hooks/use-toast";
 import { v4 as uuidv4 } from 'uuid';
@@ -28,14 +29,25 @@ const Index = () => {
       "bandwidth-1000-unguaranteed-25skmystery01",
       "ram-64g-ecc-2133-25skmystery01",
       "softraid-2x480ssd-25skmystery01"
-    ]
+    ],
+    enableLoop: false,
+    loopInterval: 60,
+    maxAttempts: 0
   });
   const [serverStatus, setServerStatus] = useState<ServerStatus | null>(null);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [lastChecked, setLastChecked] = useState<string | null>(null);
   const intervalRef = useRef<number | null>(null);
-
+  
+  // 抢购循环状态
+  const [isLooping, setIsLooping] = useState(false);
+  const [currentAttempt, setCurrentAttempt] = useState(0);
+  const [isPurchasing, setIsPurchasing] = useState(false);
+  const [lastPurchaseSuccess, setLastPurchaseSuccess] = useState<boolean | undefined>(undefined);
+  const [lastPurchaseError, setLastPurchaseError] = useState<string | undefined>(undefined);
+  const loopTimeoutRef = useRef<number | null>(null);
+  
   // 当组件加载时，从本地存储中恢复配置
   useEffect(() => {
     const savedConfig = localStorage.getItem('ovhConfig');
@@ -135,6 +147,9 @@ const Index = () => {
         availability: 'unknown'
       });
     }
+    
+    // 同时停止抢购循环
+    stopPurchaseLoop();
   };
 
   // 清除日志
@@ -200,26 +215,121 @@ const Index = () => {
   // 处理服务器购买
   const handlePurchase = async (status: ServerStatus) => {
     try {
+      setIsPurchasing(true);
       addLog('info', `尝试购买服务器 ${status.fqn} 在 ${status.datacenter}`);
       addNotification('info', '开始购买', `尝试购买服务器 ${status.fqn} 在 ${status.datacenter}`);
       
       const result = await purchaseServer(config, status);
       
       if (result.success) {
+        setLastPurchaseSuccess(true);
+        setLastPurchaseError(undefined);
         addLog('success', `订单成功! 订单 ID: ${result.orderId}`);
         addNotification(
           'success',
           '购买成功!',
           `服务器订购成功。订单 ID: ${result.orderId}`
         );
+        
+        // 购买成功后停止循环
+        stopPurchaseLoop();
       } else {
+        setLastPurchaseSuccess(false);
+        setLastPurchaseError(result.error || '未知错误');
         addLog('error', `购买失败: ${result.error}`);
         addNotification('error', '购买失败', result.error || '无法完成服务器购买');
+        
+        // 如果启用了循环抢购，则调度下一次尝试
+        if (config.enableLoop && isLooping) {
+          schedulePurchaseRetry(status);
+        }
       }
     } catch (error) {
+      setLastPurchaseSuccess(false);
+      setLastPurchaseError(error instanceof Error ? error.message : String(error));
       addLog('error', `购买过程中出错: ${error instanceof Error ? error.message : String(error)}`);
       addNotification('error', '购买错误', '购买过程中发生意外错误');
+      
+      // 如果启用了循环抢购，则调度下一次尝试
+      if (config.enableLoop && isLooping) {
+        schedulePurchaseRetry(status);
+      }
+    } finally {
+      setIsPurchasing(false);
     }
+  };
+  
+  // 开始抢购循环
+  const startPurchaseLoop = () => {
+    if (!config.enableLoop) {
+      addLog('warning', '无法启动循环抢购：未在配置中启用');
+      addNotification('warning', '循环未启用', '请在配置中启用循环抢购功能。');
+      return;
+    }
+    
+    if (!isRunning) {
+      addLog('warning', '无法启动循环抢购：监控未运行');
+      addNotification('warning', '监控未启动', '请先启动服务器监控。');
+      return;
+    }
+    
+    setIsLooping(true);
+    setCurrentAttempt(0);
+    setLastPurchaseSuccess(undefined);
+    setLastPurchaseError(undefined);
+    
+    addLog('info', '循环抢购已启动');
+    addNotification('info', '循环抢购已启动', '系统将在服务器可用时自动尝试购买，直到成功或达到最大尝试次数。');
+    
+    // 如果当前有可用服务器，立即开始购买
+    if (serverStatus && serverStatus.availability === 'available') {
+      handlePurchase(serverStatus);
+    }
+  };
+  
+  // 停止抢购循环
+  const stopPurchaseLoop = () => {
+    if (loopTimeoutRef.current !== null) {
+      clearTimeout(loopTimeoutRef.current);
+      loopTimeoutRef.current = null;
+    }
+    
+    if (isLooping) {
+      setIsLooping(false);
+      addLog('info', '循环抢购已停止');
+      addNotification('warning', '循环抢购已停止', '循环抢购已手动停止。');
+    }
+  };
+  
+  // 调度下一次购买尝试
+  const schedulePurchaseRetry = (status: ServerStatus) => {
+    // 如果已达到最大尝试次数，则停止
+    if (config.maxAttempts && config.maxAttempts > 0 && currentAttempt >= config.maxAttempts) {
+      addLog('warning', `已达到最大尝试次数 (${config.maxAttempts})，循环停止`);
+      addNotification('warning', '循环已停止', `已达到最大尝试次数 (${config.maxAttempts})。`);
+      stopPurchaseLoop();
+      return;
+    }
+    
+    // 增加尝试次数
+    setCurrentAttempt(prev => prev + 1);
+    
+    const nextAttemptCount = currentAttempt + 1;
+    const interval = config.loopInterval || 60;
+    
+    addLog('info', `安排下一次尝试 (#${nextAttemptCount}) 在 ${interval} 秒后`);
+    
+    // 设置下一次尝试的定时器
+    if (loopTimeoutRef.current !== null) {
+      clearTimeout(loopTimeoutRef.current);
+    }
+    
+    loopTimeoutRef.current = window.setTimeout(() => {
+      if (isLooping && serverStatus && serverStatus.availability === 'available') {
+        addLog('info', `执行第 ${nextAttemptCount} 次购买尝试`);
+        handlePurchase(status);
+      }
+    }, interval * 1000);
   };
 
   // 组件卸载时清理
@@ -227,6 +337,9 @@ const Index = () => {
     return () => {
       if (intervalRef.current !== null) {
         clearInterval(intervalRef.current);
+      }
+      if (loopTimeoutRef.current !== null) {
+        clearTimeout(loopTimeoutRef.current);
       }
     };
   }, []);
@@ -272,9 +385,20 @@ const Index = () => {
                 lastUpdated={lastChecked || '从未'}
               />
               
-              <div className="space-y-6">
-                <LogViewer logs={logs} onClearLogs={clearLogs} />
-              </div>
+              <PurchaseLoopStatus 
+                isLooping={isLooping}
+                currentAttempt={currentAttempt}
+                maxAttempts={config.maxAttempts || 0}
+                isPurchasing={isPurchasing}
+                onStartLoop={startPurchaseLoop}
+                onStopLoop={stopPurchaseLoop}
+                lastPurchaseSuccess={lastPurchaseSuccess}
+                lastPurchaseError={lastPurchaseError}
+              />
+            </div>
+            
+            <div className="mt-6">
+              <LogViewer logs={logs} onClearLogs={clearLogs} />
             </div>
           </div>
           

@@ -23,6 +23,9 @@ export interface OVHConfig {
   datacenter: string;
   autoCheckout: boolean;
   options: string[];
+  enableLoop?: boolean; // 是否启用循环抢购
+  loopInterval?: number; // 循环间隔（秒）
+  maxAttempts?: number; // 最大尝试次数，0表示无限
 }
 
 // 模拟检查服务器可用性

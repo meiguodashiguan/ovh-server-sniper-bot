@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { OVHConfig } from '@/utils/ovhApi';
 import { useToast } from "@/hooks/use-toast";
+import { RefreshCw } from 'lucide-react';
 
 interface ServerFormProps {
   onSubmit: (config: OVHConfig) => void;
@@ -30,12 +31,17 @@ const ServerForm: React.FC<ServerFormProps> = ({ onSubmit, isRunning, onToggleMo
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: parseInt(value) || 0 }));
+  };
+
   const handleSelectChange = (name: string, value: string) => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSwitchChange = (checked: boolean) => {
-    setFormData(prev => ({ ...prev, autoCheckout: checked }));
+  const handleSwitchChange = (name: string, checked: boolean) => {
+    setFormData(prev => ({ ...prev, [name]: checked }));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -231,16 +237,67 @@ const ServerForm: React.FC<ServerFormProps> = ({ onSubmit, isRunning, onToggleMo
             </div>
           </div>
           
-          <div className="flex items-center space-x-2 pt-2">
-            <Switch 
-              id="autoCheckout" 
-              checked={formData.autoCheckout}
-              onCheckedChange={handleSwitchChange}
-            />
-            <Label htmlFor="autoCheckout">服务器可用时自动结账</Label>
+          <div className="space-y-4 pt-2">
+            <h3 className="text-sm font-medium">购买设置</h3>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Switch 
+                  id="autoCheckout" 
+                  checked={formData.autoCheckout}
+                  onCheckedChange={(checked) => handleSwitchChange("autoCheckout", checked)}
+                />
+                <Label htmlFor="autoCheckout">服务器可用时自动结账</Label>
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Switch 
+                  id="enableLoop" 
+                  checked={!!formData.enableLoop}
+                  onCheckedChange={(checked) => handleSwitchChange("enableLoop", checked)}
+                />
+                <Label htmlFor="enableLoop">启用失败后循环抢购</Label>
+              </div>
+            </div>
+            
+            {formData.enableLoop && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="loopInterval">循环间隔 (秒)</Label>
+                  <Input 
+                    id="loopInterval" 
+                    name="loopInterval" 
+                    type="number" 
+                    placeholder="尝试间隔时间" 
+                    value={formData.loopInterval || 60} 
+                    onChange={handleNumberChange}
+                    min={10}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="maxAttempts">最大尝试次数</Label>
+                  <div className="flex items-center space-x-2">
+                    <Input 
+                      id="maxAttempts" 
+                      name="maxAttempts" 
+                      type="number" 
+                      placeholder="0 表示无限次" 
+                      value={formData.maxAttempts || 0} 
+                      onChange={handleNumberChange}
+                      min={0}
+                    />
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">(0 = 无限次)</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
           
-          <Button type="submit" className="w-full">更新配置</Button>
+          <Button type="submit" className="w-full flex items-center gap-2">
+            <RefreshCw className="h-4 w-4" />
+            更新配置
+          </Button>
         </form>
       </CardContent>
     </Card>

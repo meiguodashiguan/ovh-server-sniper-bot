@@ -59,7 +59,32 @@ export const checkServerAvailability = async (config: OVHConfig): Promise<Server
       }
     }
     
-    return await response.json();
+    const result = await response.json();
+    
+    // 处理OVH API的直接响应
+    if (Array.isArray(result)) {
+      // 如果返回的是数组，说明是直接从OVH API获取的格式
+      // 需要转换为我们的ServerStatus格式
+      return result.map(item => {
+        let availability: ServerAvailability = 'unknown';
+        
+        if (item.availability === 'available') {
+          availability = 'available';
+        } else if (item.availability === 'unavailable') {
+          availability = 'unavailable';
+        }
+        
+        return {
+          fqn: `KS-${config.planCode}`,
+          datacenter: item.datacenter || config.datacenter || 'unknown',
+          availability: availability
+        };
+      });
+    }
+    
+    // 如果返回的已经是我们的格式，直接返回
+    return result;
+    
   } catch (error) {
     console.error("检查服务器可用性出错:", error);
     throw error;
@@ -101,6 +126,16 @@ export const purchaseServer = async (config: OVHConfig, serverStatus: ServerStat
         };
       }
       
+      // 如果收到的是直接的OVH API响应
+      if (data.orderId) {
+        return {
+          success: true,
+          orderId: data.orderId,
+          orderUrl: `https://www.ovh.com/manager/order/follow.html?orderId=${data.orderId}`
+        };
+      }
+      
+      // 否则返回我们预期的格式
       return data;
     } catch (jsonError) {
       return {
@@ -139,4 +174,3 @@ export const checkApiHealth = async (): Promise<{ status: string, timestamp: str
     throw error;
   }
 };
-

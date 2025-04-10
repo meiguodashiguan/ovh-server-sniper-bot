@@ -1,8 +1,10 @@
+
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const dotenv = require('dotenv');
 const crypto = require('crypto');
+const fetch = require('node-fetch');
 
 dotenv.config();
 
@@ -29,9 +31,12 @@ app.use((req, res, next) => {
   next();
 });
 
-// OVH API签名生成器
+// OVH API签名生成器 - 根据OVH API文档实现
 function createOvhSignature(method, url, body, timestamp, appSecret, consumerKey) {
+  // 确保使用完整URL格式
   const fullUrl = `https://api.ovh.com/1.0${url}`;
+  
+  // 创建签名字符串
   const toSign = [
     appSecret,
     consumerKey,
@@ -41,7 +46,75 @@ function createOvhSignature(method, url, body, timestamp, appSecret, consumerKey
     timestamp
   ].join('+');
   
+  // 生成SHA1哈希并格式化为OVH要求的格式
   return '$1$' + crypto.createHash('sha1').update(toSign).digest('hex');
+}
+
+// 代理转发到OVH API
+async function proxyToOvhApi(req, res, path, method, body) {
+  try {
+    const config = req.body;
+    
+    if (!config.appKey || !config.appSecret || !config.consumerKey) {
+      return res.status(400).json({ 
+        error: '缺少 OVH API 凭据 (appKey, appSecret, consumerKey)' 
+      });
+    }
+    
+    const timestamp = Math.round(Date.now() / 1000);
+    const signature = createOvhSignature(method, path, body, timestamp, config.appSecret, config.consumerKey);
+    
+    const ovhUrl = `https://api.ovh.com/1.0${path}`;
+    console.log(`向OVH发送请求: ${method} ${ovhUrl}`);
+    
+    // 设置请求超时
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+    
+    const fetchOptions = {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Ovh-Application': config.appKey,
+        'X-Ovh-Consumer': config.consumerKey,
+        'X-Ovh-Timestamp': timestamp.toString(),
+        'X-Ovh-Signature': signature
+      },
+      signal: controller.signal
+    };
+    
+    if (body) {
+      fetchOptions.body = JSON.stringify(body);
+    }
+    
+    const response = await fetch(ovhUrl, fetchOptions);
+    clearTimeout(timeout);
+    
+    // 获取响应数据
+    let responseData;
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      responseData = await response.json();
+    } else {
+      responseData = await response.text();
+    }
+    
+    // 转发OVH响应状态码和数据到客户端
+    if (!response.ok) {
+      console.error('OVH API错误:', responseData);
+      return res.status(response.status).json({
+        error: `OVH API错误: ${response.status}`,
+        details: responseData
+      });
+    }
+    
+    return res.status(response.status).json(responseData);
+  } catch (error) {
+    console.error('请求OVH API时出错:', error);
+    return res.status(500).json({
+      error: `请求OVH API时出错: ${error.message || '未知错误'}`
+    });
+  }
 }
 
 // 检查服务器可用性
@@ -59,74 +132,20 @@ app.post('/check-availability', async (req, res) => {
       });
     }
     
-    const timestamp = Math.round(Date.now() / 1000);
-    const url = `/dedicated/server/supplierPlan/availability`;
+    // 构建查询参数
     const queryParams = new URLSearchParams({
       planCode: config.planCode,
       zone: config.zone
     }).toString();
     
-    const fullUrl = `https://api.ovh.com/1.0${url}?${queryParams}`;
-    const signature = createOvhSignature('GET', `${url}?${queryParams}`, null, timestamp, config.appSecret, config.consumerKey);
+    const path = `/dedicated/server/supplierPlan/availability?${queryParams}`;
     
-    if (DEBUG) {
-      console.log(`请求 URL: ${fullUrl}`);
-      console.log(`生成的签名: ${signature}`);
-    }
+    // 使用代理函数发送请求到OVH
+    await proxyToOvhApi(req, res, path, 'GET', null);
     
-    try {
-      const response = await fetch(fullUrl, {
-        method: 'GET',
-        headers: {
-          'X-Ovh-Application': config.appKey,
-          'X-Ovh-Consumer': config.consumerKey,
-          'X-Ovh-Timestamp': timestamp.toString(),
-          'X-Ovh-Signature': signature
-        }
-      });
-      
-      if (DEBUG) {
-        console.log(`OVH API 状态码: ${response.status}`);
-      }
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('OVH API 错误:', errorText);
-        return res.status(response.status).json({ 
-          error: `OVH API 错误: ${response.status} ${errorText}` 
-        });
-      }
-      
-      const result = await response.json();
-      
-      // 解析API返回的数据
-      let availability = 'unknown';
-      if (result && Array.isArray(result)) {
-        const datacenterInfo = result.find(item => 
-          (!config.datacenter || item.datacenter === config.datacenter)
-        );
-        
-        if (datacenterInfo && datacenterInfo.availability === 'available') {
-          availability = 'available';
-        } else {
-          availability = 'unavailable';
-        }
-      }
-      
-      const responseData = [{
-        fqn: `KS-${config.planCode}`,
-        datacenter: config.datacenter || 'default',
-        availability: availability
-      }];
-      
-      res.json(responseData);
-    } catch (apiError) {
-      console.error('请求 OVH API 时出错:', apiError);
-      return res.status(500).json({ error: `请求 OVH API 时出错: ${apiError.message}` });
-    }
   } catch (error) {
     console.error('服务器错误:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error.message || '服务器内部错误' });
   }
 });
 
@@ -146,84 +165,43 @@ app.post('/purchase-server', async (req, res) => {
       });
     }
     
-    try {
-      // 创建订单参数
-      const orderParams = {
-        planCode: config.planCode,
-        duration: config.duration || 'P1M',
-        pricingMode: 'default',
-        quantity: 1,
-        configuration: [
-          { label: 'os', value: config.os || 'none_64.en' }
-        ]
-      };
-      
-      // 添加选项
-      if (config.options && Array.isArray(config.options)) {
-        config.options.forEach(option => {
-          orderParams.configuration.push({
-            label: 'option',
-            value: option
-          });
-        });
-      }
-      
-      // 添加数据中心选择
-      if (config.datacenter) {
+    // 创建订单参数
+    const orderParams = {
+      planCode: config.planCode,
+      duration: config.duration || 'P1M',
+      pricingMode: 'default',
+      quantity: 1,
+      configuration: [
+        { label: 'os', value: config.os || 'none_64.en' }
+      ]
+    };
+    
+    // 添加选项
+    if (config.options && Array.isArray(config.options)) {
+      config.options.forEach(option => {
         orderParams.configuration.push({
-          label: 'datacenter',
-          value: config.datacenter
+          label: 'option',
+          value: option
         });
-      }
-      
-      const timestamp = Math.round(Date.now() / 1000);
-      const url = `/order/dedicated/server/${config.zone}`;
-      const signature = createOvhSignature('POST', url, orderParams, timestamp, config.appSecret, config.consumerKey);
-      
-      if (DEBUG) {
-        console.log(`请求 URL: https://api.ovh.com/1.0${url}`);
-        console.log(`订单参数:`, JSON.stringify(orderParams));
-      }
-      
-      const response = await fetch(`https://api.ovh.com/1.0${url}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Ovh-Application': config.appKey,
-          'X-Ovh-Consumer': config.consumerKey,
-          'X-Ovh-Timestamp': timestamp.toString(),
-          'X-Ovh-Signature': signature
-        },
-        body: JSON.stringify(orderParams)
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('OVH API 购买错误:', errorText);
-        return res.status(response.status).json({
-          success: false,
-          error: `OVH API 错误: ${response.status} ${errorText}`
-        });
-      }
-      
-      const order = await response.json();
-      
-      // 返回订单信息
-      res.json({
-        success: true,
-        orderId: order.orderId,
-        orderUrl: `https://www.ovh.com/manager/order/follow.html?orderId=${order.orderId}`
-      });
-    } catch (apiError) {
-      console.error('OVH API购买错误:', apiError);
-      res.status(400).json({
-        success: false,
-        error: apiError.message || '购买失败'
       });
     }
+    
+    // 添加数据中心选择
+    if (config.datacenter) {
+      orderParams.configuration.push({
+        label: 'datacenter',
+        value: config.datacenter
+      });
+    }
+    
+    const path = `/order/dedicated/server/${config.zone}`;
+    
+    // 使用代理函数发送购买请求到OVH
+    await proxyToOvhApi(req, res, path, 'POST', orderParams);
+    
   } catch (error) {
     console.error('服务器错误:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error.message || '服务器内部错误' });
   }
 });
 

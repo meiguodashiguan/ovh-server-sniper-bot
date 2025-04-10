@@ -37,7 +37,17 @@ const ServerForm: React.FC<ServerFormProps> = ({ onSubmit, isRunning, onToggleMo
   };
 
   const handleSelectChange = (name: string, value: string) => {
-    setFormData(prev => ({ ...prev, [name]: value }));
+    if (name === "zone") {
+      // 当区域改变时，自动更新身份标识
+      const newIdentity = `go-ovh-${value.toLowerCase()}`;
+      setFormData(prev => ({ 
+        ...prev, 
+        [name]: value,
+        identity: newIdentity
+      }));
+    } else {
+      setFormData(prev => ({ ...prev, [name]: value }));
+    }
   };
 
   const handleSwitchChange = (name: string, checked: boolean) => {
@@ -80,6 +90,11 @@ const ServerForm: React.FC<ServerFormProps> = ({ onSubmit, isRunning, onToggleMo
     { value: "P6M", label: "6 个月" },
     { value: "P12M", label: "12 个月" }
   ];
+
+  // 固定的操作系统值
+  const fixedOs = "none_64.en";
+  // 固定的订阅时长值
+  const fixedDuration = "P1M";
 
   return (
     <Card>
@@ -159,16 +174,6 @@ const ServerForm: React.FC<ServerFormProps> = ({ onSubmit, isRunning, onToggleMo
             <h3 className="text-sm font-medium">服务器详情</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="identity">身份标识</Label>
-                <Input 
-                  id="identity" 
-                  name="identity" 
-                  placeholder="您的身份标签" 
-                  value={formData.identity} 
-                  onChange={handleChange}
-                />
-              </div>
-              <div className="space-y-2">
                 <Label htmlFor="zone">OVH 区域</Label>
                 <Select 
                   value={formData.zone} 
@@ -187,6 +192,18 @@ const ServerForm: React.FC<ServerFormProps> = ({ onSubmit, isRunning, onToggleMo
                 </Select>
               </div>
               <div className="space-y-2">
+                <Label htmlFor="identity">身份标识</Label>
+                <Input 
+                  id="identity" 
+                  name="identity" 
+                  placeholder="自动生成的身份标签" 
+                  value={formData.identity} 
+                  onChange={handleChange}
+                  disabled
+                  className="bg-gray-100"
+                />
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="planCode">计划代码</Label>
                 <Input 
                   id="planCode" 
@@ -202,18 +219,19 @@ const ServerForm: React.FC<ServerFormProps> = ({ onSubmit, isRunning, onToggleMo
                   id="os" 
                   name="os" 
                   placeholder="操作系统代码" 
-                  value={formData.os} 
-                  onChange={handleChange}
+                  value={fixedOs} 
+                  disabled
+                  className="bg-gray-100"
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="duration">订阅时长</Label>
                 <Select 
-                  value={formData.duration} 
-                  onValueChange={(value) => handleSelectChange("duration", value)}
+                  value={fixedDuration} 
+                  disabled
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="选择时长" />
+                  <SelectTrigger className="bg-gray-100">
+                    <SelectValue placeholder="固定 1 个月" />
                   </SelectTrigger>
                   <SelectContent>
                     {durationOptions.map(option => (
@@ -223,6 +241,7 @@ const ServerForm: React.FC<ServerFormProps> = ({ onSubmit, isRunning, onToggleMo
                     ))}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground">固定为 1 个月</p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="datacenter">首选数据中心</Label>
